@@ -9,15 +9,15 @@
   <meta name="apple-mobile-web-app-title" content="隨手記" />
   <meta name="format-detection" content="telephone=no" />
   <title>隨手記</title>
-  <link rel="manifest" href="manifest.webmanifest?v=1.1.6" />
+  <link rel="manifest" href="manifest.webmanifest?v=1.1.7" />
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
-  <link rel="stylesheet" href="styles.css?v=1.1.6" />
+  <link rel="stylesheet" href="styles.css?v=1.1.7" />
 </head>
 <body>
   <div class="app-shell">
     <header class="topbar">
       <div>
-        <div class="title-row"><h1>隨手記</h1><span id="versionLabel" class="version-label">v1.1.6</span></div>
+        <div class="title-row"><h1>隨手記</h1><span id="versionLabel" class="version-label">v1.1.7</span></div>
         <div class="date-line">
           <span id="todayLabel"></span>
           <span id="saveStatus" class="save-status ok" aria-live="polite"><span class="status-check">✓</span><span>及時儲存</span></span>
@@ -26,6 +26,7 @@
       </div>
       <div class="header-actions">
         <button id="newNoteBtn" class="icon-btn" type="button" aria-label="新增隨手記" title="新增隨手記">＋</button>
+        <button id="dataBtn" class="icon-btn data-icon-btn" type="button" aria-label="資料備份" title="資料備份">⇅</button>
         <button id="themeBtn" class="icon-btn" type="button" aria-label="切換深色模式" title="切換深色模式">☾</button>
       </div>
     </header>
@@ -103,6 +104,24 @@
     <div id="reorderList" class="reorder-list"></div>
   </div>
 
-  <script src="app.js?v=1.1.6"></script>
+
+  <div id="dataBackdrop" class="backdrop hidden"></div>
+  <div id="dataPanel" class="data-panel hidden" role="dialog" aria-modal="true" aria-label="資料備份">
+    <div class="panel-head">
+      <button id="dataClose" class="text-btn" type="button">關閉</button>
+      <strong>資料備份</strong>
+      <span></span>
+    </div>
+    <div class="data-panel-body">
+      <div class="data-summary">目前共有 <strong id="dataNoteCount">0</strong> 筆隨手記</div>
+      <button id="exportDataBtn" class="data-action primary" type="button"><span>⇩</span><span><strong>匯出備份</strong><small>將所有隨手記存成 JSON 備份檔</small></span></button>
+      <button id="importDataBtn" class="data-action" type="button"><span>⇧</span><span><strong>匯入備份</strong><small>與現有資料合併，不會先刪除目前紀錄</small></span></button>
+      <input id="importDataFile" type="file" accept="application/json,.json" hidden />
+      <p class="data-help">匯入時會保留原本的日期、時間與內容；完全相同的紀錄會自動略過。</p>
+      <div id="dataMessage" class="data-message" aria-live="polite"></div>
+    </div>
+  </div>
+
+  <script src="app.js?v=1.1.7"></script>
 </body>
 </html>

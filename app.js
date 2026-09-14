@@ -6,17 +6,18 @@
   const THEME_KEY = 'quicknote.theme.v1';
   const AUTO_NEW_KEY = 'quicknote.autoNewDeadline.v1';
   const AUTO_NEW_DELAY = 30_000;
-  const VERSION = '1.1.6';
+  const VERSION = '1.1.7';
 
   const $ = (id) => document.getElementById(id);
   const els = {
-    todayLabel: $('todayLabel'), versionLabel: $('versionLabel'), saveStatus: $('saveStatus'), autoNewCountdown: $('autoNewCountdown'), newNoteBtn: $('newNoteBtn'), themeBtn: $('themeBtn'),
+    todayLabel: $('todayLabel'), versionLabel: $('versionLabel'), saveStatus: $('saveStatus'), autoNewCountdown: $('autoNewCountdown'), newNoteBtn: $('newNoteBtn'), dataBtn: $('dataBtn'), themeBtn: $('themeBtn'),
     noteInput: $('noteInput'), charCount: $('charCount'), editHint: $('editHint'), notesList: $('notesList'), todayCount: $('todayCount'),
     monthTitle: $('monthTitle'), calendarGrid: $('calendarGrid'), prevMonthBtn: $('prevMonthBtn'), nextMonthBtn: $('nextMonthBtn'),
     selectedDateTitle: $('selectedDateTitle'), selectedDateCount: $('selectedDateCount'), calendarNotesList: $('calendarNotesList'),
     searchInput: $('searchInput'), searchCount: $('searchCount'), searchResults: $('searchResults'),
     actionSheet: $('actionSheet'), actionSheetBackdrop: $('actionSheetBackdrop'), editAction: $('editAction'), reorderAction: $('reorderAction'), deleteAction: $('deleteAction'), cancelAction: $('cancelAction'),
-    reorderPanel: $('reorderPanel'), reorderBackdrop: $('reorderBackdrop'), reorderList: $('reorderList'), reorderCancel: $('reorderCancel'), reorderDone: $('reorderDone')
+    reorderPanel: $('reorderPanel'), reorderBackdrop: $('reorderBackdrop'), reorderList: $('reorderList'), reorderCancel: $('reorderCancel'), reorderDone: $('reorderDone'),
+    dataPanel: $('dataPanel'), dataBackdrop: $('dataBackdrop'), dataClose: $('dataClose'), dataNoteCount: $('dataNoteCount'), dataMessage: $('dataMessage'), exportDataBtn: $('exportDataBtn'), importDataBtn: $('importDataBtn'), importDataFile: $('importDataFile')
   };
 
   const now = new Date();
@@ -459,6 +460,148 @@
     els.reorderBackdrop.classList.add('hidden');
   }
 
+  function backupDateStamp() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const h = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    const sec = String(d.getSeconds()).padStart(2, '0');
+    return `${y}${m}${day}_${h}${min}${sec}`;
+  }
+
+  function updateDataSummary() {
+    const count = notes.filter(n => n.content.trim()).length;
+    els.dataNoteCount.textContent = String(count);
+  }
+
+  function showDataMessage(text, type = 'ok') {
+    els.dataMessage.textContent = text;
+    els.dataMessage.classList.toggle('error', type === 'error');
+  }
+
+  function openDataPanel() {
+    updateDataSummary();
+    showDataMessage('');
+    els.dataPanel.classList.remove('hidden');
+    els.dataBackdrop.classList.remove('hidden');
+  }
+
+  function closeDataPanel() {
+    els.dataPanel.classList.add('hidden');
+    els.dataBackdrop.classList.add('hidden');
+    els.importDataFile.value = '';
+  }
+
+  async function exportBackup() {
+    const exportNotes = sortedNotes(notes).filter(n => n.content.trim()).map(n => ({
+      id: n.id,
+      content: n.content,
+      createdAt: n.createdAt,
+      updatedAt: n.updatedAt,
+      order: n.order
+    }));
+    const payload = {
+      app: '隨手記',
+      format: 'quicknote-backup-v1',
+      appVersion: VERSION,
+      exportedAt: new Date().toISOString(),
+      noteCount: exportNotes.length,
+      notes: exportNotes
+    };
+    const json = JSON.stringify(payload, null, 2);
+    const filename = `隨手記備份_${backupDateStamp()}.json`;
+    const blob = new Blob([json], { type: 'application/json' });
+
+    try {
+      if (typeof File === 'function' && navigator.canShare) {
+        const file = new File([blob], filename, { type: 'application/json' });
+        if (navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({ files: [file], title: '隨手記備份' });
+            showDataMessage(`已準備 ${exportNotes.length} 筆備份`);
+            return;
+          } catch (err) {
+            if (err?.name === 'AbortError') return;
+          }
+        }
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+      showDataMessage(`已匯出 ${exportNotes.length} 筆備份`);
+    } catch (err) {
+      console.error(err);
+      showDataMessage('匯出失敗，請再試一次', 'error');
+    }
+  }
+
+  function normalizeImportedNote(n, index) {
+    if (!n || typeof n !== 'object') return null;
+    const content = typeof n.content === 'string' ? n.content : '';
+    if (!content.trim()) return null;
+    const createdAt = Number.isNaN(Date.parse(n.createdAt)) ? new Date().toISOString() : new Date(n.createdAt).toISOString();
+    const updatedAt = Number.isNaN(Date.parse(n.updatedAt || n.createdAt)) ? createdAt : new Date(n.updatedAt || n.createdAt).toISOString();
+    return {
+      id: String(n.id || cryptoId()),
+      content,
+      createdAt,
+      updatedAt,
+      order: Number.isFinite(Number(n.order)) ? Number(n.order) : index
+    };
+  }
+
+  function noteFingerprint(n) {
+    return `${n.createdAt}\u0000${n.content}`;
+  }
+
+  async function importBackupFile(file) {
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const payload = JSON.parse(text);
+      const rawNotes = Array.isArray(payload) ? payload : payload?.notes;
+      if (!Array.isArray(rawNotes)) throw new Error('格式不符');
+
+      const incoming = rawNotes.map(normalizeImportedNote).filter(Boolean).sort((a,b) => (a.order - b.order) || (new Date(a.createdAt) - new Date(b.createdAt)));
+      const fingerprints = new Set(notes.filter(n => n.content.trim()).map(noteFingerprint));
+      const ids = new Set(notes.map(n => n.id));
+      let nextOrder = notes.reduce((max, n) => Math.max(max, Number.isFinite(n.order) ? n.order : -1), -1) + 1;
+      let added = 0;
+      let skipped = 0;
+
+      for (const item of incoming) {
+        const fp = noteFingerprint(item);
+        if (fingerprints.has(fp)) {
+          skipped += 1;
+          continue;
+        }
+        if (ids.has(item.id)) item.id = cryptoId();
+        item.order = nextOrder++;
+        notes.push(item);
+        ids.add(item.id);
+        fingerprints.add(fp);
+        added += 1;
+      }
+
+      if (added > 0 && !persistNotes()) throw new Error('無法寫入本機資料');
+      renderAll();
+      updateDataSummary();
+      showDataMessage(`匯入完成：新增 ${added} 筆，略過重複 ${skipped} 筆`);
+    } catch (err) {
+      console.error(err);
+      showDataMessage('匯入失敗：請確認選擇的是隨手記 JSON 備份檔', 'error');
+    } finally {
+      els.importDataFile.value = '';
+    }
+  }
+
   function switchView(id) {
     document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === id));
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.view === id));
@@ -488,6 +631,7 @@
 
     els.noteInput.addEventListener('input', handleInput);
     els.newNoteBtn.addEventListener('click', () => beginNewNote());
+    els.dataBtn.addEventListener('click', openDataPanel);
     els.themeBtn.addEventListener('click', () => applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'));
     els.searchInput.addEventListener('input', renderSearch);
     els.prevMonthBtn.addEventListener('click', () => { calendarCursor = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() - 1, 1); renderCalendar(); });
@@ -502,6 +646,12 @@
     els.reorderBackdrop.addEventListener('click', () => closeReorder(false));
     els.reorderCancel.addEventListener('click', () => closeReorder(false));
     els.reorderDone.addEventListener('click', () => closeReorder(true));
+
+    els.dataBackdrop.addEventListener('click', closeDataPanel);
+    els.dataClose.addEventListener('click', closeDataPanel);
+    els.exportDataBtn.addEventListener('click', exportBackup);
+    els.importDataBtn.addEventListener('click', () => els.importDataFile.click());
+    els.importDataFile.addEventListener('change', () => importBackupFile(els.importDataFile.files?.[0]));
 
     window.addEventListener('storage', (e) => {
       if (e.key === STORAGE_KEY) { notes = loadNotes(); renderAll(); }

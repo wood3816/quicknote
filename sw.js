@@ -1,10 +1,10 @@
-const CACHE = 'quicknote-v1.1.6';
+const CACHE = 'quicknote-v1.1.7';
 const ASSETS = [
   './',
   './index.html',
-  './styles.css?v=1.1.6',
-  './app.js?v=1.1.6',
-  './manifest.webmanifest?v=1.1.6',
+  './styles.css?v=1.1.7',
+  './app.js?v=1.1.7',
+  './manifest.webmanifest?v=1.1.7',
   './icons/icon-192.png',
   './icons/icon-512.png'
 ];
