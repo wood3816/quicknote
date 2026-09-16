@@ -1,0 +1,15 @@
+{
+  "name": "隨手記",
+  "short_name": "隨手記",
+  "description": "快速、離線、即時儲存的手機隨手記 PWA",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f5f6f7",
+  "theme_color": "#f5f6f7",
+  "lang": "zh-Hant",
+  "icons": [
+    {"src":"./icons/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},
+    {"src":"./icons/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
+  ]
+}
