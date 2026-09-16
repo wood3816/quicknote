@@ -1,5 +1,5 @@
 globalThis.APP_CONFIG = Object.freeze({
-  VERSION: "1.0.0",
+  VERSION: "1.0.1",
   APP_NAME: "隨手記",
   DB_NAME: "suishouji-db",
   DB_VERSION: 1,
